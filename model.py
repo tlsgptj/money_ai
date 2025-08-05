@@ -48,7 +48,7 @@ def make_prompt_auto(text: str) -> str:
     else:
         return (
             "당신은 금융보안 전문가입니다.\n"
-            "아래 주관식 질문에 대해 정확하고 간략한 설명을 작성하세요.\n\n"
+            "아래 주관식 질문에 대해 **정확하고 자세하며 끊기지 않게 끝까지** 설명하세요.\n\n"
             f"질문: {text}\n\n"
             "답변:"
         )
@@ -66,7 +66,7 @@ def extract_answer_only(generated_text: str, original_question: str) -> str:
 # ===========================
 # 모델 로드 (4bit + CPU 오프로딩)
 # ===========================
-model_name = "beomi/gemma-ko-7b"
+model_name = "yanolja/EEVE-Korean-Instruct-7B-v2.0-Preview"
 
 quant_config = BitsAndBytesConfig(
     load_in_4bit=True,  # 8GB VRAM 환경에서는 4bit 권장
@@ -101,7 +101,7 @@ for start_idx in tqdm(range(0, len(test), batch_size), desc="Inference"):
 
     outputs = pipe(
         prompts,
-        max_new_tokens=64,  # 128 → 64로 단축 (속도 개선)
+        max_new_tokens=128,  # 128 → 64로 단축 (속도 개선)
         temperature=0.2,
         top_p=0.9,
         do_sample=False     # deterministic하게
@@ -115,6 +115,6 @@ for start_idx in tqdm(range(0, len(test), batch_size), desc="Inference"):
 # ===========================
 sample_submission = pd.read_csv('./sample_submission.csv')
 sample_submission['Answer'] = preds
-sample_submission.to_csv('./baseline_submission.csv', index=False, encoding='utf-8-sig')
+sample_submission.to_csv('./improve_submission.csv', index=False, encoding='utf-8-sig')
 
-print("✅ baseline_submission.csv 저장 완료")
+print("✅ improve_submission.csv 저장 완료")
