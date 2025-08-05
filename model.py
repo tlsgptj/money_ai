@@ -2,8 +2,8 @@ import re
 import os
 import pandas as pd
 from tqdm import tqdm
-import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, BitsAndBytesConfig
+from peft import PeftModel  # 누락 임포트 추가
 
 # CUDA 디버그 옵션
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -39,7 +39,7 @@ def make_prompt_auto(text: str) -> str:
         question, options = extract_question_and_choices(text)
         return (
             "당신은 금융보안 전문가입니다.\n"
-            "아래 질문에 대해 적절한 **정답 선택지 번호만 출력**하세요.\n\n"
+            "아래 질문에 대해 적절한 **정답 선택지 번호만 출력**하세요. **개인정보보호법이랑 전자금융거래법을 참조하세요.**\n\n"
             f"질문: {question}\n"
             "선택지:\n"
             f"{chr(10).join(options)}\n\n"
@@ -48,7 +48,7 @@ def make_prompt_auto(text: str) -> str:
     else:
         return (
             "당신은 금융보안 전문가입니다.\n"
-            "아래 주관식 질문에 대해 **정확하고 자세하며 끊기지 않게 끝까지** 설명하세요.\n\n"
+            "아래 주관식 질문에 대해 **정확하고 자세하며 끊기지 않게 끝까지** 설명하세요. **개인정보보호법이랑 전자금융거래법을 참조하세요.**\n\n"
             f"질문: {text}\n\n"
             "답변:"
         )
@@ -64,23 +64,23 @@ def extract_answer_only(generated_text: str, original_question: str) -> str:
     return text
 
 # ===========================
-# 모델 로드 (4bit + CPU 오프로딩)
+# 모델 로드 (4bit)
 # ===========================
-model_name = "yanolja/EEVE-Korean-Instruct-7B-v2.0-Preview"
+MODEL_NAME = "yanolja/EEVE-Korean-Instruct-7B-v2.0-Preview"
+LORA_DIR = "./lora-output"
 
-quant_config = BitsAndBytesConfig(
-    load_in_4bit=True,  # 8GB VRAM 환경에서는 4bit 권장
-    bnb_4bit_compute_dtype=torch.float16,
-    llm_int8_enable_fp32_cpu_offload=True
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype="float16"
 )
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
+base_model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
     device_map="auto",
-    quantization_config=quant_config,
-    torch_dtype=torch.float16
+    quantization_config=bnb_config
 )
+model = PeftModel.from_pretrained(base_model, LORA_DIR)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 pipe = pipeline(
     "text-generation",
@@ -93,28 +93,13 @@ pipe = pipeline(
 # 추론 (배치 처리)
 # ===========================
 preds = []
-batch_size = 2  # 배치 2~4 권장 (VRAM 8GB 기준)
+for q in tqdm(test["Question"]):
+    prompt = make_prompt_auto(q)
+    out = pipe(prompt, max_new_tokens=128, temperature=0.2, do_sample=False)[0]["generated_text"]
+    answer = extract_answer_only(out, q)
+    preds.append(answer)
 
-for start_idx in tqdm(range(0, len(test), batch_size), desc="Inference"):
-    batch_questions = test['Question'][start_idx:start_idx + batch_size]
-    prompts = [make_prompt_auto(q) for q in batch_questions]
-
-    outputs = pipe(
-        prompts,
-        max_new_tokens=128,  # 128 → 64로 단축 (속도 개선)
-        temperature=0.2,
-        top_p=0.9,
-        do_sample=False     # deterministic하게
-    )
-
-    for q, out in zip(batch_questions, outputs):
-        preds.append(extract_answer_only(out[0]["generated_text"], original_question=q))
-
-# ===========================
-# 제출 파일 생성
-# ===========================
-sample_submission = pd.read_csv('./sample_submission.csv')
-sample_submission['Answer'] = preds
-sample_submission.to_csv('./improve_submission.csv', index=False, encoding='utf-8-sig')
-
-print("✅ improve_submission.csv 저장 완료")
+sample_submission = pd.read_csv("./sample_submission.csv")
+sample_submission["Answer"] = preds
+sample_submission.to_csv("./finetuned2_submission.csv", index=False, encoding="utf-8-sig")
+print("✅ 추론 완료: finetuned2_submission.csv")
