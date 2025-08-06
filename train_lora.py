@@ -87,10 +87,10 @@ def preprocess(batch):
     for instr, output in zip(batch["instruction"], batch["output"]):
         # 1. full input = 질문 + 답변
         full_text = f"{instr} {output}"
-        tokenized = tokenizer(full_text, max_length=256, truncation=True)
+        tokenized = tokenizer(full_text, max_length=1024, truncation=True)
 
         # 2. 질문 부분만 -100 처리
-        instr_ids = tokenizer(instr, max_length=256, truncation=True)["input_ids"]
+        instr_ids = tokenizer(instr, max_length=1024, truncation=True)["input_ids"]
         label_ids = tokenized["input_ids"].copy()
         label_ids[:len(instr_ids)] = [IGNORE_INDEX] * len(instr_ids)
 
@@ -113,13 +113,13 @@ training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=1, # GPU 한 대당 한 번에 처리하는 데이터 샘플 수
     gradient_accumulation_steps=8, # 실제 업데이트 전에 8번 미니배치의 그래디언트를 누적 → 효과적으로 배치 크기 8배
-    learning_rate=2e-4, # 가중치 업데이트 시 적용되는 학습률(0.0002)
-    num_train_epochs=3, # 전체 데이터셋을 3회 반복 학습
+    learning_rate=4e-4, # 가중치 업데이트 시 적용되는 학습률(0.0002)
+    num_train_epochs=5, # 전체 데이터셋을 5회 반복 학습
     fp16=True, # 16-bit 반정밀도 부동소수점 연산 사용 → 메모리 절약, 속도 향상
     save_total_limit=2, # 저장할 체크포인트 최대 개수. 초과 시 오래된 것 삭제
     logging_steps=10, # 0 스텝마다 로그(손실, 학습률 등) 출력
     save_steps=100, # 100 스텝마다 모델 체크포인트 저장
-    report_to="none"
+    report_to="none" # wandb 사용 금지
 )
 
 trainer = Trainer(
