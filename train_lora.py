@@ -111,15 +111,17 @@ data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
 # ===============================
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
-    per_device_train_batch_size=1, # GPU 한 대당 한 번에 처리하는 데이터 샘플 수
-    gradient_accumulation_steps=8, # 실제 업데이트 전에 8번 미니배치의 그래디언트를 누적 → 효과적으로 배치 크기 8배
-    learning_rate=4e-4, # 가중치 업데이트 시 적용되는 학습률(0.0002)
-    num_train_epochs=5, # 전체 데이터셋을 5회 반복 학습
-    fp16=True, # 16-bit 반정밀도 부동소수점 연산 사용 → 메모리 절약, 속도 향상
-    save_total_limit=2, # 저장할 체크포인트 최대 개수. 초과 시 오래된 것 삭제
-    logging_steps=10, # 0 스텝마다 로그(손실, 학습률 등) 출력
-    save_steps=100, # 100 스텝마다 모델 체크포인트 저장
-    report_to="none" # wandb 사용 금지
+    per_device_train_batch_size=1,       # GPU 한 대당 한 번에 처리하는 데이터 샘플 수
+    gradient_accumulation_steps=8,       # 실제 업데이트 전에 8번 미니배치의 그래디언트를 누적
+    learning_rate=2e-4,                  # 안정적인 LR (이전 실험에서 가장 정확도 좋음)
+    num_train_epochs=5,                  # 전체 데이터셋을 5회 반복 학습
+    lr_scheduler_type="cosine",          # cosine scheduler로 학습률 점진 감소
+    warmup_ratio=0.03,                   # 학습 초반 3% 구간은 학습률 천천히 증가
+    fp16=True,                           # 16-bit 연산
+    save_total_limit=2,                  # 저장할 체크포인트 최대 개수
+    logging_steps=10,                    # 로그 출력 간격
+    save_steps=100,                      # 체크포인트 저장 간격
+    report_to="none"                     # wandb/logging 비활성화
 )
 
 trainer = Trainer(

@@ -101,5 +101,5 @@ for q in tqdm(test["Question"]):
 
 sample_submission = pd.read_csv("./sample_submission.csv")
 sample_submission["Answer"] = preds
-sample_submission.to_csv("./finetuned4_submission.csv", index=False, encoding="utf-8-sig")
-print("✅ 추론 완료: finetuned4_submission.csv")
+sample_submission.to_csv("./finetuned6_submission.csv", index=False, encoding="utf-8-sig")
+print("✅ 추론 완료: finetuned5_submission.csv")
